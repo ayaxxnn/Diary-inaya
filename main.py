@@ -56,40 +56,48 @@ def add_product_command(message):
     if message.from_user.id != ADMIN_ID:
         bot.send_message(message.chat.id, "❌ Only admin can add products.")
         return
-    bot.send_message(message.chat.id, "Send product name and price.\nOne line:\nPepsi 45\n\nTwo lines:\nPepsi\n45")
+    bot.send_message(message.chat.id,
+        "Send product name and price.\n"
+        "One line example: Pepsi 45\n"
+        "Two lines example:\nPepsi\n45"
+    )
     bot.register_next_step_handler(message, process_add_product)
 
 def process_add_product(message):
     try:
+        # Always work with string
         txt = str(message.text).strip()
 
-        # Agar multi-line hai
+        # Try to split into name and price
         if "\n" in txt:
-            parts = txt.split("\n")
-            name = parts[0].strip()
-            price_str = parts.strip()
+            lines = txt.split("\n")
+            name = str(lines[0]).strip()
+            price_str = str(lines).strip()
         else:
-            # One-line case
             parts = txt.rsplit(" ", 1)
             if len(parts) != 2:
-                bot.send_message(message.chat.id, "❌ Please provide product name and price.")
+                bot.send_message(message.chat.id, "❌ Please send product name and price.")
                 return
-            name = parts.strip()
-            price_str = parts.strip()
+            name = str(parts).strip()
+            price_str = str(parts).strip()
 
-        # Price cleaning
+        # Clean price (remove ₹, rs, rupees)
         price_str = price_str.lower().replace("₹", "").replace("rs", "").replace("rupees", "").strip()
+
+        # Convert to number
         price = float(price_str)
 
-        # Save new product
+        # Save
         products.append({"name": name, "price": price})
         save_data(PRODUCTS_FILE, products)
 
         bot.send_message(message.chat.id, f"✅ Added: {name} - ₹{price}")
+
     except ValueError:
-        bot.send_message(message.chat.id, "❌ Price must be a number.")
+        bot.send_message(message.chat.id, "❌ Price must be a valid number.")
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {e}")
+
 
 # --------------------- BUY PRODUCT -----------------
 @bot.message_handler(func=lambda m: m.text.isdigit())
