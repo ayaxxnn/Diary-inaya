@@ -4,38 +4,44 @@ import telebot
 from datetime import datetime
 import threading
 
-TOKEN = "8209067688:AAEOV2Rp21MATE75q-qBPDYf6GGrg02zFyc"
-ADMIN_ID = 6788809365  # Apna Telegram ID
-
-bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
+# --------------------- CONFIG -------------------
+TOKEN = "8209067688:AAHuhJgquP6La48yaTw3KUdFhxkI1ooj-zY"   # Apna BotFather token daal
+ADMIN_ID = 6788809365       # Apna Telegram ID @userinfobot se lo
 
 PRODUCTS_FILE = "products.json"
 PURCHASES_FILE = "purchases.json"
 
-def load_data(file):
+# --------------------- BOT INIT ------------------
+bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
+
+# --------------------- DATA FUNCTIONS ------------
+def load_data(file, default):
     if os.path.exists(file):
         with open(file, "r", encoding="utf-8") as f:
             return json.load(f)
-    return [] if file == PRODUCTS_FILE else {}
+    return default
 
 def save_data(file, data):
     with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-products = load_data(PRODUCTS_FILE)
-purchases = load_data(PURCHASES_FILE)
+products = load_data(PRODUCTS_FILE, [
+    {"name": "Gold Amul Milk", "price": 37},
+    {"name": "Amul Taza", "price": 29},
+    {"name": "Toast Big", "price": 75},
+    {"name": "Tuar Dal 1kg", "price": 115}
+])
+save_data(PRODUCTS_FILE, products)
 
-# ---------- Helper Price Parser ----------
-def parse_price(price_text):
-    clean = price_text.lower().replace("₹", "").replace("rs", "").replace("rupees", "").strip()
-    return float(clean)
+purchases = load_data(PURCHASES_FILE, {})
 
-# ---------- Commands ----------
+# --------------------- START COMMAND --------------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Welcome! 🛒 Use /products to see items, /total for your purchase summary.")
+    bot.reply_to(message, "Welcome! 🛒\nUse /products to see items, /total to see your purchases, /delete to remove an item.")
 
+# --------------------- LIST PRODUCTS ---------------
 @bot.message_handler(commands=['products'])
 def list_products(message):
     text = "📦 Available Products:\n"
@@ -44,28 +50,48 @@ def list_products(message):
     text += "\nSend product number to buy."
     bot.send_message(message.chat.id, text)
 
+# --------------------- ADD PRODUCT (ADMIN) ---------
 @bot.message_handler(commands=['add'])
 def add_product_command(message):
     if message.from_user.id != ADMIN_ID:
         bot.send_message(message.chat.id, "❌ Only admin can add products.")
         return
-    bot.send_message(message.chat.id, "Send product name and price in one line: Example:\nAmul Cheese 150")
+    bot.send_message(message.chat.id, "Send product name and price.\nOne line:\nPepsi 45\n\nTwo lines:\nPepsi\n45")
     bot.register_next_step_handler(message, process_add_product)
 
 def process_add_product(message):
     try:
-        parts = message.text.rsplit(" ", 1)  # Name and last word as price
-        if len(parts) != 2:
-            bot.send_message(message.chat.id, "❌ Format: ProductName Price\nExample: Amul Cheese 150")
-            return
-        name = parts[0].strip()
-        price = parse_price(parts)
+        txt = str(message.text).strip()
+
+        # Agar multi-line hai
+        if "\n" in txt:
+            parts = txt.split("\n")
+            name = parts[0].strip()
+            price_str = parts.strip()
+        else:
+            # One-line case
+            parts = txt.rsplit(" ", 1)
+            if len(parts) != 2:
+                bot.send_message(message.chat.id, "❌ Please provide product name and price.")
+                return
+            name = parts.strip()
+            price_str = parts.strip()
+
+        # Price cleaning
+        price_str = price_str.lower().replace("₹", "").replace("rs", "").replace("rupees", "").strip()
+        price = float(price_str)
+
+        # Save new product
         products.append({"name": name, "price": price})
         save_data(PRODUCTS_FILE, products)
+
         bot.send_message(message.chat.id, f"✅ Added: {name} - ₹{price}")
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Price must be a number.")
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {e}")
 
+# --------------------- BUY PRODUCT -----------------
 @bot.message_handler(func=lambda m: m.text.isdigit())
 def buy_product(message):
     idx = int(message.text) - 1
@@ -84,6 +110,7 @@ def buy_product(message):
     else:
         bot.send_message(message.chat.id, "❌ Invalid product number.")
 
+# --------------------- TOTAL PURCHASES -------------
 @bot.message_handler(commands=['total'])
 def total_purchase(message):
     user_id = str(message.from_user.id)
@@ -94,6 +121,7 @@ def total_purchase(message):
     history = "\n".join([f"{i+1}. {p['name']} - ₹{p['price']} on {p['date']}" for i, p in enumerate(purchases[user_id])])
     bot.send_message(message.chat.id, f"🛒 Purchase History:\n{history}\n\n💰 Total Spent: ₹{total_amount}")
 
+# --------------------- DELETE PURCHASE -------------
 @bot.message_handler(commands=['delete'])
 def delete_purchase(message):
     user_id = str(message.from_user.id)
@@ -117,10 +145,12 @@ def process_delete(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"Error: {e}")
 
+# --------------------- FLASK APP -------------------
 @app.route('/')
 def home():
     return "Bot is running!"
 
+# --------------------- RUN -------------------------
 if __name__ == '__main__':
     threading.Thread(target=lambda: bot.infinity_polling(skip_pending=True)).start()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
