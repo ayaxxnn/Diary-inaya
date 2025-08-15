@@ -4,7 +4,7 @@ import telebot
 from datetime import datetime
 import threading
 
-TOKEN = "8209067688:AAG89WS4BzGhVznDeO5ClWtGEQsyiEbTVCs"
+TOKEN = "8209067688:AAEOV2Rp21MATE75q-qBPDYf6GGrg02zFyc"
 ADMIN_ID = 6788809365  # Apna Telegram ID
 
 bot = telebot.TeleBot(TOKEN)
