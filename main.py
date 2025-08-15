@@ -5,7 +5,7 @@ from datetime import datetime
 import threading
 
 # --------------------- CONFIG -------------------
-TOKEN = "8209067688:AAHuhJgquP6La48yaTw3KUdFhxkI1ooj-zY"   # Apna BotFather token daal
+TOKEN = "8209067688:AAGmcOAsPScLSVh87JL5_k5M9kWPA13RIRc"   # Apna BotFather token daal
 ADMIN_ID = 6788809365       # Apna Telegram ID @userinfobot se lo
 
 PRODUCTS_FILE = "products.json"
